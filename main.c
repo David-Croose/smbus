@@ -3,29 +3,9 @@
 #include <fcntl.h>
 #include <stropts.h>
 #include <unistd.h>
+#include <errno.h>
 #include <linux/i2c-dev.h>
 #include <linux/i2c.h>
-
-#if 0
-this is some code reference from linux
-
-#define I2C_SMBUS_QUICK		    0
-#define I2C_SMBUS_BYTE		    1
-#define I2C_SMBUS_BYTE_DATA	    2
-#define I2C_SMBUS_WORD_DATA	    3
-#define I2C_SMBUS_PROC_CALL	    4
-#define I2C_SMBUS_BLOCK_DATA	    5
-#define I2C_SMBUS_I2C_BLOCK_BROKEN  6
-#define I2C_SMBUS_BLOCK_PROC_CALL   7		// SMBus 2.0
-#define I2C_SMBUS_I2C_BLOCK_DATA    8
-
-union i2c_smbus_data {
-	__u8 byte;
-	__u16 word;
-	__u8 block[I2C_SMBUS_BLOCK_MAX + 2]; /* block[0] is used for length */
-			       /* and one more for user-space compatibility */
-};
-#endif
 
 static void print_help(void)
 {
@@ -52,7 +32,7 @@ int main(int argc, char *argv[])
 	unsigned int _size;
 	char tmp[3];
 	union i2c_smbus_data data;
-	int i;
+	int i, j;
 
 	/*
 	 * check parameter
@@ -93,12 +73,13 @@ int main(int argc, char *argv[])
 	if (rw == 'w') {
 		printf("    data:    ");
 		tmp[sizeof(tmp) - 1] = 0;
-		for (i = 0; i < size; i++) {
+		for (j = 0, i = 0; i < size * 2; i += 2, j++) {
 			tmp[0] = argv[6][i];
 			tmp[1] = argv[6][i + 1];
-			data.block[i] = strtoul(tmp, NULL, 16);
-			printf("%02x ", data.block[i]);
+			data.block[j] = strtoul(tmp, NULL, 16);
 		}
+		for (i = 0; i < size; i++)
+			printf("%02x ", data.block[i]);
 		printf("\n");
 	}
 
@@ -106,8 +87,8 @@ int main(int argc, char *argv[])
 	 * process
 	 */
 	fd = open(name, O_RDWR);
-	if (fd) {
-		printf("error: open %s failed. ret=%d\n", name, fd);
+	if (fd < 0) {
+		printf("error: open %s failed. ret=%d\n", name, errno);
 		return -1;
 	}
 
